@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row g-4">
+  <div class="col-md-4">
+    <div class="card bg-secondary text-white h-100">
+      <div class="card-body">
+        <h6 class="card-subtitle mb-2 text-light">Bitcoin 현재가</h6>
+        <h2 class="card-title">${{ price.price_usd|floatformat:0 }}</h2>
+        <p class="card-text {% if price.change_24h >= 0 %}text-success{% else %}text-danger{% endif %}">
+          24h 변동: {{ price.change_24h|floatformat:2 }}%
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-8">
+    <div class="card bg-secondary text-white h-100">
+      <div class="card-body">
+        <h6>가격 예측</h6>
+        <div class="btn-group mb-3" id="horizonBtns">
+          <button class="btn btn-outline-warning btn-sm" data-horizon="1h">1시간</button>
+          <button class="btn btn-outline-warning btn-sm" data-horizon="24h">24시간</button>
+          <button class="btn btn-outline-warning btn-sm" data-horizon="7d">7일</button>
+        </div>
+        <div id="predictionResult" class="fs-4"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card bg-secondary text-white">
+      <div class="card-body">
+        <h6>가격 히스토리 차트</h6>
+        <canvas id="priceChart" height="80"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.querySelectorAll("#horizonBtns button").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const horizon = btn.dataset.horizon;
+      const res = await fetch(`/api/prediction/predict/?horizon=${horizon}`);
+      const data = await res.json();
+      document.getElementById("predictionResult").textContent =
+        `${horizon} 예측: $${data.predicted_price?.toLocaleString() ?? data.error}`;
+    });
+  });
+
+  async function loadChart() {
+    const res = await fetch("/api/market/candles/?limit=50");
+    const candles = await res.json();
+    const labels = candles.map(c => new Date(c.timestamp).toLocaleDateString("ko"));
+    const closes = candles.map(c => parseFloat(c.close));
+    new Chart(document.getElementById("priceChart"), {
+      type: "line",
+      data: {
+        labels: labels.reverse(),
+        datasets: [{ label: "BTC Close", data: closes.reverse(),
+          borderColor: "#f7931a", tension: 0.1, fill: false }]
+      },
+      options: { plugins: { legend: { labels: { color: "#fff" } } },
+                 scales: { x: { ticks: { color: "#aaa" } }, y: { ticks: { color: "#aaa" } } } }
+    });
+  }
+  loadChart();
+</script>
+{% endblock %}
